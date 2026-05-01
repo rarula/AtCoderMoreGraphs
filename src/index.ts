@@ -148,6 +148,13 @@ async function setup(): Promise<void> {
     buttonParent.appendChild(divider);
     buttonParent.appendChild(btn);
 
+    const expand = document.getElementById("rating-graph-expand");
+    expand?.addEventListener("click", () => {
+        replaced.status.style.maxWidth = replaced.status.style.maxHeight = "";
+        replaced.graph.style.maxWidth = replaced.graph.style.maxHeight = "";
+        expand.style.cssText = 'display: none !important;';
+    });
+
     const updateRender = () => {
         btn.textContent = "View by " + specs[(activeGraphIndex + 1) % specs.length].buttonLabel;
         graph.render(specs[activeGraphIndex]);
