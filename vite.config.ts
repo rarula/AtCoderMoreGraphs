@@ -6,9 +6,9 @@ export default defineConfig({
         monkey({
             entry: "src/index.ts",
             userscript: {
-                name: "Count-based Rating Graph",
+                name: "AtCoder More Graphs",
                 version: "1.0.0",
-                description: "レーティンググラフの横軸を「年月日」から「参加回数」へ切り替え可能にします",
+                description: "参加回数別のレーティンググラフや、パフォーマンスグラフを追加します。",
                 author: "rarula",
                 include: [
                     "*://atcoder.jp/users*"
