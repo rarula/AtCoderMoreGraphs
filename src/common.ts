@@ -20,6 +20,25 @@ export const buildRatingYAxis = (): AxisSpec<DetailedRatingEntry> => ({
     tickFormatter: (tick) => tick.toString(),
 });
 
+export const buildPerformanceYAxis = (): AxisSpec<DetailedRatingEntry> => ({
+    value: (entry) => entry.Performance,
+    range: (data) => {
+        const MARGIN_Y = 300;
+        const minRaw = Math.min(...data.map(entry => entry.Performance));
+        const maxRaw = Math.max(...data.map(entry => entry.Performance));
+        const min = Math.min(1500, Math.max(0, minRaw - 100));
+        const max = maxRaw + MARGIN_Y;
+        return [min, max];
+    },
+    ticks: ([min, max]) => {
+        const STEP = 400;
+        const out: number[] = [];
+        for (let t = Math.ceil(min / STEP) * STEP; t <= max; t += STEP) out.push(t);
+        return out;
+    },
+    tickFormatter: (tick) => tick.toString(),
+});
+
 export const buildDateXAxis = (): AxisSpec<DetailedRatingEntry> => ({
     value: (entry) => entry.EndTime,
     range: (data) => {

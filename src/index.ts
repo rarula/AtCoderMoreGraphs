@@ -2,26 +2,42 @@ import * as cj from "createjs-module";
 import { Graph, type GraphSpec } from "./types/graph";
 import { Status } from "./types/status";
 import type { DetailedRatingEntry } from "./types/rating";
-import { buildCountXAxis, buildDateXAxis, buildRatingYAxis } from "./common";
+import { buildCountXAxis, buildDateXAxis, buildPerformanceYAxis, buildRatingYAxis } from "./common";
 import { fetchDetailedHistory } from "./fetch";
 
 const SETUP_RETRY_INTERVAL_MS = 50; // セットアップのリトライ間隔 (ミリ秒)
 const COUNT_GRAPH_MARGIN_X = 2 / 3; // 参加回数グラフのX軸の余白サイズ
 
-const GRAPH_DATE: GraphSpec<DetailedRatingEntry> = {
-    id: "date",
-    buttonLabel: "Date",
+const GRAPH_RATING_DATE: GraphSpec<DetailedRatingEntry> = {
+    id: "date_rating",
+    buttonLabel: "Date (Rating)",
     xAxisMode: "date",
     xAxis: buildDateXAxis(),
     yAxis: buildRatingYAxis(),
 };
 
-const GRAPH_COUNT: GraphSpec<DetailedRatingEntry> = {
-    id: "count",
-    buttonLabel: "Count",
+const GRAPH_RATING_COUNT: GraphSpec<DetailedRatingEntry> = {
+    id: "count_rating",
+    buttonLabel: "Count (Rating)",
     xAxisMode: "count",
     xAxis: buildCountXAxis(COUNT_GRAPH_MARGIN_X),
     yAxis: buildRatingYAxis(),
+};
+
+const GRAPH_PERFORMANCE_DATE: GraphSpec<DetailedRatingEntry> = {
+    id: "date_performance",
+    buttonLabel: "Date (Performance)",
+    xAxisMode: "date",
+    xAxis: buildDateXAxis(),
+    yAxis: buildPerformanceYAxis(),
+};
+
+const GRAPH_PERFORMANCE_COUNT: GraphSpec<DetailedRatingEntry> = {
+    id: "count_performance",
+    buttonLabel: "Count (Performance)",
+    xAxisMode: "count",
+    xAxis: buildCountXAxis(COUNT_GRAPH_MARGIN_X),
+    yAxis: buildPerformanceYAxis(),
 };
 
 function replaceOriginalRatingGraph(): { graph: HTMLCanvasElement; status: HTMLCanvasElement } | null {
@@ -100,8 +116,10 @@ async function setup(): Promise<void> {
     };
 
     const specs: GraphSpec<DetailedRatingEntry>[] = [
-        { ...GRAPH_DATE, onHover },
-        { ...GRAPH_COUNT, onHover }
+        { ...GRAPH_RATING_DATE, onHover },
+        { ...GRAPH_RATING_COUNT, onHover },
+        { ...GRAPH_PERFORMANCE_DATE, onHover },
+        { ...GRAPH_PERFORMANCE_COUNT, onHover }
     ];
 
     const graph = new Graph<DetailedRatingEntry>(stageGraph);

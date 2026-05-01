@@ -7,13 +7,15 @@ export async function fetchDetailedHistory(username: string, history: RatingEntr
         if (res.ok) {
             const data = await res.json() as DetailedRatingEntry[];
             const out: DetailedRatingEntry[] = [];
-            for (let i = 0; i < history.length; i++) {
+            let historyIndex = 0;
+            for (let i = 0; i < data.length; i++) {
                 if (data[i].IsRated) {
-                    data[i].EndTime = history[i].EndTime;
-                    data[i].StandingsUrl = history[i].StandingsUrl;
-                    if (data[i].Performance < 0) data[i].Performance = 0;
-                    if (data[i].InnerPerformance < 0) data[i].InnerPerformance = 0;
+                    data[i].EndTime = history[historyIndex].EndTime;
+                    data[i].StandingsUrl = history[historyIndex].StandingsUrl;
+                    if (data[i].Performance < 0) data[historyIndex].Performance = 0;
+                    if (data[i].InnerPerformance < 0) data[historyIndex].InnerPerformance = 0;
                     out.push(data[i]);
+                    historyIndex++;
                 }
             }
             return out;
