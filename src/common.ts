@@ -1,7 +1,7 @@
 import type { AxisSpec } from "./types/graph";
-import type { RatingEntry } from "./types/rating";
+import type { DetailedRatingEntry } from "./types/rating";
 
-export const buildRatingYAxis = (): AxisSpec<RatingEntry> => ({
+export const buildRatingYAxis = (): AxisSpec<DetailedRatingEntry> => ({
     value: (entry) => entry.NewRating,
     range: (data) => {
         const MARGIN_Y = 300;
@@ -20,7 +20,7 @@ export const buildRatingYAxis = (): AxisSpec<RatingEntry> => ({
     tickFormatter: (tick) => tick.toString(),
 });
 
-export const buildDateXAxis = (): AxisSpec<RatingEntry> => ({
+export const buildDateXAxis = (): AxisSpec<DetailedRatingEntry> => ({
     value: (entry) => entry.EndTime,
     range: (data) => {
         const ONE_DAY_SECONDS = 60 * 60 * 24;
@@ -32,7 +32,7 @@ export const buildDateXAxis = (): AxisSpec<RatingEntry> => ({
     tickFormatter: () => "",
 });
 
-export const buildCountXAxis = (margin: number): AxisSpec<RatingEntry> => ({
+export const buildCountXAxis = (margin: number): AxisSpec<DetailedRatingEntry> => ({
     value: (_entry, index) => index + 1,
     range: (data) => {
         const n = Math.max(1, data.length);

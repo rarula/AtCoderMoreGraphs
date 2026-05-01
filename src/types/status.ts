@@ -1,5 +1,5 @@
 import * as cj from "createjs-module";
-import { getColorByRating, RATING_COLOR_MAP, type RatingEntry } from "./rating";
+import { getColorByRating, RATING_COLOR_MAP, type DetailedRatingEntry } from "./rating";
 import { getDiff, getOrdinal } from "../utils";
 
 const STATUS_OFFSET_X = 50;
@@ -89,7 +89,7 @@ export class Status {
         return t;
     }
 
-    setStatus(data: RatingEntry, particleFlag: boolean): void {
+    setStatus(data: DetailedRatingEntry, particleFlag: boolean): void {
         const date = new Date(data.EndTime * 1000);
         const rating = data.NewRating;
         const oldRating = data.OldRating;

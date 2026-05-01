@@ -9,6 +9,20 @@ export type RatingEntry = {
     StandingsUrl?: string;
 }
 
+export type DetailedRatingEntry = {
+    IsRated: boolean;
+    Place: number;
+    OldRating: number;
+    NewRating: number;
+    Performance: number;
+    InnerPerformance: number;
+    ContestScreenName: string;
+    ContestName: string;
+    ContestNameEn: string;
+    EndTime: number;
+    StandingsUrl?: string;
+}
+
 export type RatingColor = {
     rating: number;
     color: Color;

@@ -1,13 +1,14 @@
 import * as cj from "createjs-module";
 import { Graph, type GraphSpec } from "./types/graph";
 import { Status } from "./types/status";
-import type { RatingEntry } from "./types/rating";
+import type { DetailedRatingEntry } from "./types/rating";
 import { buildCountXAxis, buildDateXAxis, buildRatingYAxis } from "./common";
+import { fetchDetailedHistory } from "./fetch";
 
 const SETUP_RETRY_INTERVAL_MS = 50; // セットアップのリトライ間隔 (ミリ秒)
 const COUNT_GRAPH_MARGIN_X = 2 / 3; // 参加回数グラフのX軸の余白サイズ
 
-const GRAPH_DATE: GraphSpec<RatingEntry> = {
+const GRAPH_DATE: GraphSpec<DetailedRatingEntry> = {
     id: "date",
     buttonLabel: "Date",
     xAxisMode: "date",
@@ -15,7 +16,7 @@ const GRAPH_DATE: GraphSpec<RatingEntry> = {
     yAxis: buildRatingYAxis(),
 };
 
-const GRAPH_COUNT: GraphSpec<RatingEntry> = {
+const GRAPH_COUNT: GraphSpec<DetailedRatingEntry> = {
     id: "count",
     buttonLabel: "Count",
     xAxisMode: "count",
@@ -63,11 +64,7 @@ function initStage(stage: cj.Stage, canvas: HTMLCanvasElement) {
     stage.enableMouseOver();
 }
 
-let lastEntry = window.rating_history[window.rating_history.length - 1];
-let tickerBound = false;
-let activeGraphIndex = 0;
-
-function setup(): void {
+async function setup(): Promise<void> {
     const replaced = replaceOriginalRatingGraph();
     if (!replaced) {
         console.error("AtCoderMoreGraphs: Failed to replace original rating graph/status elements.");
@@ -78,6 +75,17 @@ function setup(): void {
         return;
     }
 
+    const username = document.querySelector(".username")?.textContent?.trim();
+    if (!username) {
+        console.error("AtCoderMoreGraphs: Failed to determine username.");
+        return;
+    }
+
+    const history = await fetchDetailedHistory(username, window.rating_history);
+    let lastEntry = history[history.length - 1];
+    let tickerBound = false;
+    let activeGraphIndex = 0;
+
     const stageStatus = new cj.Stage(replaced.status);
     const stageGraph = new cj.Stage(replaced.graph);
     initStage(stageStatus, replaced.status);
@@ -86,18 +94,18 @@ function setup(): void {
     const statusPanel = new Status(stageStatus, replaced.status);
     statusPanel.setStatus(lastEntry, false);
 
-    const onHover = (entry: RatingEntry) => {
+    const onHover = (entry: DetailedRatingEntry) => {
         lastEntry = entry;
         statusPanel.setStatus(entry, true);
     };
 
-    const specs: GraphSpec<RatingEntry>[] = [
+    const specs: GraphSpec<DetailedRatingEntry>[] = [
         { ...GRAPH_DATE, onHover },
         { ...GRAPH_COUNT, onHover }
     ];
 
-    const graph = new Graph<RatingEntry>(stageGraph);
-    graph.setData(window.rating_history);
+    const graph = new Graph<DetailedRatingEntry>(stageGraph);
+    graph.setData(history);
 
     if (!tickerBound) {
         tickerBound = true;
