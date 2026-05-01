@@ -141,7 +141,7 @@ async function setup(): Promise<void> {
     btn.className = "btn btn-primary";
     btn.type = "button";
     btn.id = "graphViewSwitcher";
-    btn.style = "margin-left: 3px; width: 120px;";
+    btn.style = "margin-left: 3px; width: 210px;";
 
     const buttonParents = document.getElementsByClassName("btn-text-group");
     const buttonParent = buttonParents[buttonParents.length - 1];
