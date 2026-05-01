@@ -1,95 +1,42 @@
 import * as cj from "createjs-module";
 import { Graph, type GraphSpec } from "./types/graph";
 import { Status } from "./types/status";
-import type { RatingEntry } from "./types/ratingEntry";
+import type { RatingEntry } from "./types/rating";
+import { buildCountXAxis, buildDateXAxis, buildRatingYAxis } from "./common";
 
-const SETUP_RETRY_INTERVAL_MS = 50; // セットアップのリトライ間隔（ms）
-const COUNT_MARGIN = 2 / 3; // CountグラフのX軸の余白
-
-// HTML要素の作成
-const ELEM_DIVIDER = document.createElement("span");
-ELEM_DIVIDER.className = "divider";
-
-const ELEM_BUTTON = document.createElement("button");
-ELEM_BUTTON.className = "btn btn-primary";
-ELEM_BUTTON.type = "button";
-ELEM_BUTTON.id = "graphViewSwitcher";
-ELEM_BUTTON.style = "margin-left: 3px; width: 120px;";
-
-// グラフの定義
-const RATING_Y_AXIS: GraphSpec<RatingEntry>["yAxis"] = {
-    value: (entry) => entry.NewRating,
-    range: (data) => {
-        const minRaw = Math.min(...data.map(entry => entry.NewRating));
-        const maxRaw = Math.max(...data.map(entry => entry.NewRating));
-        const min = Math.min(1500, Math.max(0, minRaw - 100));
-        const max = maxRaw + 300;
-        return [min, max];
-    },
-    ticks: ([min, max]) => {
-        const out: number[] = [];
-        const step = 400;
-        for (let t = Math.ceil(min / step) * step; t <= max; t += step) out.push(t);
-        return out;
-    },
-    tickFormatter: (tick) => tick.toString(),
-};
+const SETUP_RETRY_INTERVAL_MS = 50; // セットアップのリトライ間隔 (ミリ秒)
+const COUNT_GRAPH_MARGIN_X = 2 / 3; // 参加回数グラフのX軸の余白サイズ
 
 const GRAPH_DATE: GraphSpec<RatingEntry> = {
     id: "date",
     buttonLabel: "Date",
     xAxisMode: "date",
-    xAxis: {
-        value: (entry) => entry.EndTime,
-        range: (data) => {
-            const min = Math.min(...data.map(entry => entry.EndTime)) - 86400 * 30;
-            const max = Math.max(...data.map(entry => entry.EndTime)) + 86400 * 30;
-            return [min, max];
-        },
-        ticks: () => [],
-        tickFormatter: () => "",
-    },
-    yAxis: RATING_Y_AXIS,
+    xAxis: buildDateXAxis(),
+    yAxis: buildRatingYAxis(),
 };
 
 const GRAPH_COUNT: GraphSpec<RatingEntry> = {
     id: "count",
     buttonLabel: "Count",
     xAxisMode: "count",
-    xAxis: {
-        value: (_entry, index) => index + 1,
-        range: (data) => {
-            const n = Math.max(1, data.length);
-            return [1 - COUNT_MARGIN, n + COUNT_MARGIN];
-        },
-        ticks: ([min, max]) => {
-            const minTick = Math.ceil(min);
-            const maxTick = Math.floor(max);
-            const out: number[] = [];
-            const step = Math.max(1, Math.ceil((maxTick - minTick) / 8));
-            for (let t = minTick; t <= maxTick; t += step) out.push(t);
-            return out;
-        },
-        tickFormatter: (tick) => tick.toString(),
-    },
-    yAxis: RATING_Y_AXIS,
+    xAxis: buildCountXAxis(COUNT_GRAPH_MARGIN_X),
+    yAxis: buildRatingYAxis(),
 };
-
-function cloneCanvas(oldCanvas: HTMLCanvasElement, newId: string): HTMLCanvasElement {
-    const canvas = document.createElement("canvas");
-    canvas.id = newId;
-    canvas.width = oldCanvas.width;
-    canvas.height = oldCanvas.height;
-    canvas.className = oldCanvas.className;
-    canvas.style.cssText = oldCanvas.style.cssText;
-    return canvas;
-}
 
 function replaceOriginalRatingGraph(): { graph: HTMLCanvasElement; status: HTMLCanvasElement } | null {
     const oldGraph = document.getElementById("ratingGraph");
     const oldStatus = document.getElementById("ratingStatus");
-
     if (!(oldGraph instanceof HTMLCanvasElement) || !(oldStatus instanceof HTMLCanvasElement)) return null;
+
+    const cloneCanvas = (old: HTMLCanvasElement, newId: string): HTMLCanvasElement => {
+        const canvas = document.createElement("canvas");
+        canvas.id = newId;
+        canvas.width = old.width;
+        canvas.height = old.height;
+        canvas.className = old.className;
+        canvas.style.cssText = old.style.cssText;
+        return canvas;
+    }
 
     const newGraph = cloneCanvas(oldGraph, "ratingGraphCustom");
     const newStatus = cloneCanvas(oldStatus, "ratingStatusCustom");
@@ -106,22 +53,30 @@ function initStage(stage: cj.Stage, canvas: HTMLCanvasElement) {
     if (width && height && window.devicePixelRatio) {
         canvas.setAttribute("width", String(Math.round(Number(width) * window.devicePixelRatio)));
         canvas.setAttribute("height", String(Math.round(Number(height) * window.devicePixelRatio)));
-        stage.scaleX = stage.scaleY = window.devicePixelRatio;
+        stage.scaleX = window.devicePixelRatio;
+        stage.scaleY = window.devicePixelRatio;
     }
     canvas.style.maxWidth = width + "px";
     canvas.style.maxHeight = height + "px";
-    canvas.style.width = canvas.style.height = "100%";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
     stage.enableMouseOver();
 }
 
+let lastEntry = window.rating_history[window.rating_history.length - 1];
 let tickerBound = false;
+let activeGraphIndex = 0;
 
 function setup(): void {
-    console.log("Setting up...");
-
-    // グラフの初期化と描画
     const replaced = replaceOriginalRatingGraph();
-    if (!replaced) return;
+    if (!replaced) {
+        console.error("AtCoderMoreGraphs: Failed to replace original rating graph/status elements.");
+        return;
+    }
+    if (window.rating_history.length === 0) {
+        console.warn("AtCoderMoreGraphs: No rating history data found.");
+        return;
+    }
 
     const stageStatus = new cj.Stage(replaced.status);
     const stageGraph = new cj.Stage(replaced.graph);
@@ -129,7 +84,6 @@ function setup(): void {
     initStage(stageGraph, replaced.graph);
 
     const statusPanel = new Status(stageStatus, replaced.status);
-    let lastEntry = window.rating_history[window.rating_history.length - 1];
     statusPanel.setStatus(lastEntry, false);
 
     const onHover = (entry: RatingEntry) => {
@@ -137,16 +91,13 @@ function setup(): void {
         statusPanel.setStatus(entry, true);
     };
 
-    // onLeave は指定しない
     const specs: GraphSpec<RatingEntry>[] = [
         { ...GRAPH_DATE, onHover },
         { ...GRAPH_COUNT, onHover }
     ];
-    let activeGraphIndex = 0;
 
     const graph = new Graph<RatingEntry>(stageGraph);
     graph.setData(window.rating_history);
-    graph.render(specs[0]);
 
     if (!tickerBound) {
         tickerBound = true;
@@ -157,23 +108,31 @@ function setup(): void {
         });
     }
 
-    // ボタンをページに追加
+    const divider = document.createElement("span");
+    divider.className = "divider";
+
+    const btn = document.createElement("button");
+    btn.className = "btn btn-primary";
+    btn.type = "button";
+    btn.id = "graphViewSwitcher";
+    btn.style = "margin-left: 3px; width: 120px;";
+
     const buttonParents = document.getElementsByClassName("btn-text-group");
     const buttonParent = buttonParents[buttonParents.length - 1];
-    buttonParent.appendChild(ELEM_DIVIDER);
-    buttonParent.appendChild(ELEM_BUTTON);
+    buttonParent.appendChild(divider);
+    buttonParent.appendChild(btn);
 
-    ELEM_BUTTON.textContent = "View by " + specs[(activeGraphIndex + 1) % specs.length].buttonLabel;
-
-    // ボタンのクリックイベントを設定
-    ELEM_BUTTON.addEventListener("click", () => {
-        activeGraphIndex = (activeGraphIndex + 1) % specs.length;
+    const updateRender = () => {
+        btn.textContent = "View by " + specs[(activeGraphIndex + 1) % specs.length].buttonLabel;
         graph.render(specs[activeGraphIndex]);
-        ELEM_BUTTON.textContent = "View by " + specs[(activeGraphIndex + 1) % specs.length].buttonLabel;
-        console.log(`Switched to graph: ${specs[activeGraphIndex].id}`);
+    };
+
+    btn.addEventListener("click", () => {
+        activeGraphIndex = (activeGraphIndex + 1) % specs.length;
+        updateRender();
     });
 
-    console.log("Setup completed.");
+    updateRender();
 }
 
 function wait(): void {
@@ -187,4 +146,4 @@ function wait(): void {
     trySetup();
 }
 
-wait();
+window.addEventListener("load", wait);

@@ -1,59 +1,32 @@
 import * as cj from "createjs-module";
-import type { RatingEntry } from "./ratingEntry";
+import { getColorByRating, RATING_COLOR_MAP, type RatingEntry } from "./rating";
+import { getDiff, getOrdinal } from "../utils";
 
 const STATUS_OFFSET_X = 50;
 const STATUS_OFFSET_Y = 5;
-const STATUS_RIGHT_PAD = 10;
-const STATUS_BOTTOM_PAD = 5;
+const STATUS_PADDING_R = 10;
+const STATUS_PADDING_B = 5;
+const STATUS_STEP_SIZE = 400;
 
-const STAR_MIN = 3200;
+const STAR_MIN_RATING = 3200;
 const PARTICLE_MIN = 3;
 const PARTICLE_MAX = 20;
 const LIFE_MAX = 30;
 
-const STATUS_COLORS: Array<[number, string, number]> = [
-    [0,    "#808080", 0.15],
-    [400,  "#804000", 0.15],
-    [800,  "#008000", 0.15],
-    [1200, "#00C0C0", 0.2],
-    [1600, "#0000FF", 0.1],
-    [2000, "#C0C000", 0.25],
-    [2400, "#FF8000", 0.2],
-    [2800, "#FF0000", 0.1]
-];
-const STATUS_STEP_SIZE = 400;
-
 type Particle = cj.Text & {
     vx: number;
     vy: number;
-    rot_speed: number;
+    rotSpeed: number;
     life: number;
 };
 
-function getStatusColor(x: number): [number, string, number] {
-    for (let i = STATUS_COLORS.length - 1; i >= 0; i--) {
-        if (x >= STATUS_COLORS[i][0]) return STATUS_COLORS[i];
-    }
-    return [-1, "#000000", 0.1];
-}
-
 function getRatingPer(x: number): number {
-    let pre = STATUS_COLORS[STATUS_COLORS.length - 1][0] + STATUS_STEP_SIZE;
-    for (let i = STATUS_COLORS.length - 1; i >= 0; i--) {
-        if (x >= STATUS_COLORS[i][0]) return (x - STATUS_COLORS[i][0]) / (pre - STATUS_COLORS[i][0]);
-        pre = STATUS_COLORS[i][0];
+    let pre = RATING_COLOR_MAP[RATING_COLOR_MAP.length - 1].rating + STATUS_STEP_SIZE;
+    for (let i = RATING_COLOR_MAP.length - 1; i >= 0; i--) {
+        if (x >= RATING_COLOR_MAP[i].rating) return (x - RATING_COLOR_MAP[i].rating) / (pre - RATING_COLOR_MAP[i].rating);
+        pre = RATING_COLOR_MAP[i].rating;
     }
     return 0;
-}
-
-function getOrdinal(x: number): string {
-    const s = ["th", "st", "nd", "rd"], v = x % 100;
-    return x + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
-function getDiff(x: number): string {
-    const sign = x === 0 ? "±" : (x < 0 ? "-" : "+");
-    return sign + Math.abs(x);
 }
 
 export class Status {
@@ -74,8 +47,8 @@ export class Status {
         this.stage = stage;
         const rawWidth = Number(canvas.getAttribute("width") || canvas.width);
         const rawHeight = Number(canvas.getAttribute("height") || canvas.height);
-        this.width = rawWidth - STATUS_OFFSET_X - STATUS_RIGHT_PAD;
-        this.height = rawHeight - STATUS_OFFSET_Y - STATUS_BOTTOM_PAD;
+        this.width = rawWidth - STATUS_OFFSET_X - STATUS_PADDING_R;
+        this.height = rawHeight - STATUS_OFFSET_Y - STATUS_PADDING_B;
 
         this.border = new cj.Shape();
         this.stage.addChild(this.border);
@@ -116,16 +89,16 @@ export class Status {
         return t;
     }
 
-    setStatus(data: RatingEntry, particleFlag: boolean) {
+    setStatus(data: RatingEntry, particleFlag: boolean): void {
         const date = new Date(data.EndTime * 1000);
         const rating = data.NewRating;
         const oldRating = data.OldRating;
 
-        const [, color, alpha] = getStatusColor(rating);
-        this.border.graphics.c().s(color).ss(1).rr(STATUS_OFFSET_X, STATUS_OFFSET_Y, this.width, this.height, 2);
+        const color = getColorByRating(rating);
+        this.border.graphics.c().s(color.hex).ss(1).rr(STATUS_OFFSET_X, STATUS_OFFSET_Y, this.width, this.height, 2);
 
         this.ratingText.text = String(rating);
-        this.ratingText.color = color;
+        this.ratingText.color = color.hex;
         this.placeText.text = getOrdinal(data.Place);
         this.diffText.text = getDiff(rating - oldRating);
         this.dateText.text = date.toLocaleDateString();
@@ -135,39 +108,13 @@ export class Status {
 
         if (particleFlag) {
             const particleNum = Math.floor(Math.pow(getRatingPer(rating), 2) * (PARTICLE_MAX - PARTICLE_MIN) + PARTICLE_MIN);
-            this.setParticles(particleNum, color, alpha, rating);
+            this.setParticles(particleNum, color.hex, color.alpha, rating);
         }
 
         this.stage.update();
     }
 
-    private setParticles(num: number, color: string, alpha: number, rating: number) {
-        for (let i = 0; i < PARTICLE_MAX; i++) {
-            if (i < num) {
-                this.setParticle(this.particles[i], this.ratingText.x, this.ratingText.y, color, alpha, rating >= STAR_MIN);
-            } else {
-                this.particles[i].life = 0;
-                this.particles[i].visible = false;
-            }
-        }
-    }
-
-    private setParticle(p: Particle, x: number, y: number, color: string, alpha: number, star: boolean) {
-        p.x = x;
-        p.y = y;
-        const ang = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 4 + 4;
-        p.vx = Math.cos(ang) * speed;
-        p.vy = Math.sin(ang) * speed;
-        p.rot_speed = Math.random() * 20 + 10;
-        p.life = LIFE_MAX;
-        p.visible = true;
-        p.color = color;
-        p.text = star ? "★" : "@";
-        p.alpha = alpha;
-    }
-
-    updateParticles() {
+    updateParticles(): void {
         for (let i = 0; i < PARTICLE_MAX; i++) {
             const p = this.particles[i];
             if (p.life <= 0) {
@@ -179,8 +126,35 @@ export class Status {
             p.y += p.vy;
             p.vy *= 0.9;
             p.life--;
-            p.scaleX = p.scaleY = p.life / LIFE_MAX;
-            p.rotation += p.rot_speed;
+            p.scaleX = p.life / LIFE_MAX;
+            p.scaleY = p.life / LIFE_MAX;
+            p.rotation += p.rotSpeed;
         }
+    }
+
+    private setParticles(num: number, color: string, alpha: number, rating: number): void {
+        for (let i = 0; i < PARTICLE_MAX; i++) {
+            if (i < num) {
+                this.setParticle(this.particles[i], this.ratingText.x, this.ratingText.y, color, alpha, rating >= STAR_MIN_RATING);
+            } else {
+                this.particles[i].life = 0;
+                this.particles[i].visible = false;
+            }
+        }
+    }
+
+    private setParticle(p: Particle, x: number, y: number, color: string, alpha: number, star: boolean): void {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 4 + 4;
+        p.x = x;
+        p.y = y;
+        p.vx = Math.cos(angle) * speed;
+        p.vy = Math.sin(angle) * speed;
+        p.rotSpeed = Math.random() * 20 + 10;
+        p.life = LIFE_MAX;
+        p.visible = true;
+        p.color = color;
+        p.text = star ? "★" : "@";
+        p.alpha = alpha;
     }
 }

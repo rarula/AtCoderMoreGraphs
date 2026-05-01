@@ -1,38 +1,21 @@
 import * as cj from "createjs-module";
+import { getPer } from "../utils";
+import { getColorByRating, RATING_COLOR_MAP } from "./rating";
 
-const OFFSET_X = 50;
-const OFFSET_Y = 5;
-const PANEL_RIGHT_PAD = 10;
-const PANEL_BOTTOM_PAD = 30;
-const LABEL_FONT = "12px Lato";
-const START_YEAR = 2010;
-const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const YEAR_SEC = 86400 * 365;
-const STEP_SIZE = 400;
-const COLORS: Array<[number, string, number]> = [
-    [0,    "#808080", 0.15],
-    [400,  "#804000", 0.15],
-    [800,  "#008000", 0.15],
-    [1200, "#00C0C0", 0.2],
-    [1600, "#0000FF", 0.1],
-    [2000, "#C0C000", 0.25],
-    [2400, "#FF8000", 0.2],
-    [2800, "#FF0000", 0.1]
-];
+const RECT_OFFSET_X = 50;
+const RECT_OFFSET_Y = 5;
+const PANEL_PADDING_R = 10;
+const PANEL_PADDING_B = 30;
 const HIGHEST_WIDTH = 80;
 const HIGHEST_HEIGHT = 20;
 
-function getPer(x: number, l: number, r: number): number {
-    return (x - l) / (r - l);
-}
+const LABEL_FONT = "12px Lato";
 
-function getColor(x: number): [number, string, number] {
-    for (let i = COLORS.length - 1; i >= 0; i--) {
-        if (x >= COLORS[i][0]) return COLORS[i];
-    }
-    return [-1, "#000000", 0.1];
-}
+const START_YEAR = 2010;
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+const YEAR_SEC = 86400 * 365;
+const STEP_SIZE = 400;
 
 export type AxisSpec<T> = {
     value: (entry: T, index: number) => number;
@@ -70,7 +53,6 @@ export type GraphSpec<T> = {
     yAxis: AxisSpec<T>;
     xAxisMode: "date" | "count";
     onHover?: (entry: T, index: number) => void;
-    onLeave?: () => void;
 }
 
 export class Graph<T> {
@@ -153,13 +135,15 @@ export class Graph<T> {
 
         // Color bands
         let y1 = 0;
-        for (let i = COLORS.length - 1; i >= 0; i--) {
-            const y2 = rect.height - rect.height * getPer(COLORS[i][0], yMin, yMax);
+        for (let i = RATING_COLOR_MAP.length - 1; i >= 0; i--) {
+            const rating = RATING_COLOR_MAP[i].rating;
+            const color = RATING_COLOR_MAP[i].color;
+            const y2 = rect.height - rect.height * getPer(rating, yMin, yMax);
             if (y2 > 0 && y1 < rect.height) {
                 const top = Math.max(y1, 0);
                 const bottom = Math.min(y2, rect.height);
                 if (bottom > top) {
-                    panel.graphics.f(COLORS[i][1]).r(0, top, rect.width, bottom - top);
+                    panel.graphics.f(color.hex).r(0, top, rect.width, bottom - top);
                 }
             }
             y1 = y2;
@@ -241,7 +225,6 @@ export class Graph<T> {
         if (!ctx.data.length) return;
 
         const rect = ctx.plot;
-
         const points = ctx.data
             .map((entry, index) => ({
                 x: spec.xAxis.value(entry, index),
@@ -280,11 +263,11 @@ export class Graph<T> {
         for (let i = 0; i < points.length; i++) {
             const x = rect.left + rect.width * getPer(points[i].x, ctx.xRange[0], ctx.xRange[1]);
             const y = rect.top + rect.height - rect.height * getPer(points[i].y, ctx.yRange[0], ctx.yRange[1]);
-            const color = getColor(points[i].y)[1];
+            const color = getColorByRating(points[i].y);
 
             const dot = new cj.Shape() as cj.Shape & { i?: number };
             dot.graphics.s(i === highestIndex ? "#000" : "#FFF");
-            dot.graphics.ss(0.5).f(color).dc(0, 0, 3.5);
+            dot.graphics.ss(0.5).f(color.hex).dc(0, 0, 3.5);
             dot.x = x;
             dot.y = y;
             dot.i = points[i].index;
@@ -349,10 +332,10 @@ export class Graph<T> {
         const width = canvas.width / scale;
         const height = canvas.height / scale;
 
-        const left = OFFSET_X;
-        const top = OFFSET_Y;
-        const right = width - PANEL_RIGHT_PAD;
-        const bottom = height - PANEL_BOTTOM_PAD;
+        const left = RECT_OFFSET_X;
+        const top = RECT_OFFSET_Y;
+        const right = width - PANEL_PADDING_R;
+        const bottom = height - PANEL_PADDING_B;
 
         return {
             left,
@@ -364,23 +347,14 @@ export class Graph<T> {
         };
     }
 
-    private scaleX(value: number, range: [number, number], rect: PlotArea): number {
-        const span = range[1] - range[0] || 1;
-        return rect.left + ((value - range[0]) / span) * rect.width;
-    }
-
-    private scaleY(value: number, range: [number, number], rect: PlotArea): number {
-        const span = range[1] - range[0] || 1;
-        return rect.bottom - ((value - range[0]) / span) * rect.height;
-    }
-
     private bindHover() {
         if (!this.currentSpec) return;
 
         const setVertexScale = (index: number, scale: number) => {
             const v = this.vertices[index];
             if (!v) return;
-            v.scaleX = v.scaleY = scale;
+            v.scaleX = scale;
+            v.scaleY = scale;
         };
 
         const onOver = (eventObj: Object) => {
@@ -398,7 +372,6 @@ export class Graph<T> {
             if (typeof target.i !== "number") return;
             setVertexScale(target.i, 1);
             this.stage.update();
-            this.currentSpec?.onLeave?.();
         };
 
         this.vertices.forEach((v) => {

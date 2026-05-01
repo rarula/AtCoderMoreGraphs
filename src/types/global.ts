@@ -1,4 +1,4 @@
-import type { RatingEntry } from "./ratingEntry";
+import type { RatingEntry } from "./rating";
 
 declare global {
     interface Window {
